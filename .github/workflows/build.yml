@@ -21,23 +21,20 @@ jobs:
     - name: Set up Flutter
       uses: subosito/flutter-action@v2
       with:
-        flutter-version: '3.19.0'
         channel: 'stable'
 
-    - name: Create Flutter App
+    - name: Create Clean App Project
       run: |
         flutter create app --org com.hasnawi.cashclip
         cd app
         flutter pub add google_mobile_ads
         
-        # Set minimum SDK version to 21 for AdMob compatibility
-        sed -i 's/minSdkVersion.*/minSdkVersion 21/g' android/app/build.gradle
+        # Adjust Android configurations for compatibility
+        sed -i 's/minSdkVersion .*/minSdkVersion 21/g' android/app/build.gradle
+        sed -i 's/compileSdkVersion .*/compileSdkVersion 34/g' android/app/build.gradle
+        sed -i 's/targetSdkVersion .*/targetSdkVersion 34/g' android/app/build.gradle
 
-        # Update Kotlin version for compatibility
-        sed -i 's/ext.kotlin_version = .*/ext.kotlin_version = "1.9.10"/g' android/build.gradle || true
-        sed -i 's/ext.kotlin_version = .*/ext.kotlin_version = "1.9.10"/g' android/settings.gradle || true
-
-    - name: Inject CashClip Code
+    - name: Inject CashClip App Code
       run: |
         cat << 'EOF' > app/lib/main.dart
         import 'package:flutter/material.dart';
@@ -190,12 +187,12 @@ jobs:
         }
         EOF
 
-    - name: Build APK
+    - name: Build APK File
       run: |
         cd app
         flutter build apk --release
 
-    - name: Upload APK Artifact
+    - name: Download Artifact APK
       uses: actions/upload-artifact@v4
       with:
         name: CashClip-release-apk
