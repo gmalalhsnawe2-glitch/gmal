@@ -1,0 +1,8 @@
+dependencies:
+  flutter:
+    sdk: flutter
+  firebase_core: ^2.27.0
+  cloud_firestore: ^4.15.8
+  firebase_auth: ^4.17.8
+  youtube_player_flutter: ^8.1.2
+  google_mobile_ads: ^3.0.0
