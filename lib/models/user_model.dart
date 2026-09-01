@@ -1,35 +1,29 @@
-class UserModel {
-  final String id;
-  final String name;
-  final String email;
-  final int points;
-  final double balance;
+import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'screens/login_screen.dart';
+import 'theme/app_colors.dart';
 
-  UserModel({
-    required this.id,
-    required this.name,
-    required this.email,
-    required this.points,
-    required this.balance,
-  });
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
+  MobileAds.instance.initialize();
+  runApp(const SkipCashApp());
+}
 
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'name': name,
-      'email': email,
-      'points': points,
-      'balance': balance,
-    };
-  }
+class SkipCashApp extends StatelessWidget {
+  const SkipCashApp({super.key});
 
-  factory UserModel.fromJson(Map<String, dynamic> json) {
-    return UserModel(
-      id: json['id'] ?? '',
-      name: json['name'] ?? '',
-      email: json['email'] ?? '',
-      points: json['points'] ?? 0,
-      balance: (json['balance'] ?? 0.0).toDouble(),
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'SkipCash',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        scaffoldBackgroundColor: AppColors.background,
+        fontFamily: 'Cairo',
+      ),
+      home: const LoginScreen(),
     );
   }
 }
