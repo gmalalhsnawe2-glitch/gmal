@@ -1,4 +1,4 @@
-name: Build CashClip APK
+name: Build CashClip Pro APK
 
 on:
   push:
@@ -23,58 +23,24 @@ jobs:
       with:
         channel: 'stable'
 
-    - name: Create Clean App Project
+    - name: Build App
       run: |
         flutter create app --org com.hasnawi.cashclip
         cd app
-        flutter pub add google_mobile_ads
         
-        # Adjust minSdkVersion for AdMob compatibility
-        sed -i 's/minSdkVersion .*/minSdkVersion 21/g' android/app/build.gradle
+        # Add required dependencies
+        flutter pub add youtube_player_flutter google_fonts
 
-        # Write standard AndroidManifest.xml with AdMob App ID
-        cat << 'EOF' > android/app/src/main/AndroidManifest.xml
-        <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-            <application
-                android:label="CashClip"
-                android:name="${applicationName}"
-                android:icon="@mipmap/ic_launcher">
-                <meta-data
-                    android:name="com.google.android.gms.ads.APPLICATION_ID"
-                    android:value="ca-app-pub-3940256099942544~3347511713"/>
-                <activity
-                    android:name=".MainActivity"
-                    android:exported="true"
-                    android:launchMode="singleTop"
-                    android:theme="@style/LaunchTheme"
-                    android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
-                    android:hardwareAccelerated="true"
-                    android:windowSoftInputMode="adjustResize">
-                    <meta-data
-                      android:name="io.flutter.embedding.android.NormalTheme"
-                      android:resource="@style/NormalTheme"
-                      />
-                    <intent-filter>
-                        <action android:name="android.intent.action.MAIN"/>
-                        <category android:name="android.intent.category.LAUNCHER"/>
-                    </intent-filter>
-                </activity>
-                <meta-data
-                    android:name="flutterEmbedding"
-                    android:value="2" />
-            </application>
-        </manifest>
-        EOF
+        # Fix minSdkVersion for Youtube Player compatibility
+        sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/g' android/app/build.gradle
 
-    - name: Inject CashClip App Code
-      run: |
-        cat << 'EOF' > app/lib/main.dart
+        cat << 'EOF' > lib/main.dart
         import 'package:flutter/material.dart';
-        import 'package:google_mobile_ads/google_mobile_ads.dart';
+        import 'package:google_fonts/google_fonts.dart';
+        import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 
         void main() {
           WidgetsFlutterBinding.ensureInitialized();
-          MobileAds.instance.initialize();
           runApp(const CashClipApp());
         }
 
@@ -84,11 +50,12 @@ jobs:
           @override
           Widget build(BuildContext context) {
             return MaterialApp(
-              title: 'CashClip',
+              title: 'CashClip Pro',
               debugShowCheckedModeBanner: false,
               theme: ThemeData(
-                scaffoldBackgroundColor: const Color(0xFF121212),
+                scaffoldBackgroundColor: const Color(0xFF09090E),
                 brightness: Brightness.dark,
+                textTheme: GoogleFonts.cairoTextTheme(ThemeData.dark().textTheme),
               ),
               home: const MainHomeScreen(),
             );
@@ -105,127 +72,319 @@ jobs:
         class _MainHomeScreenState extends State<MainHomeScreen> {
           int _userPoints = 1250;
           double _userBalance = 12.50;
-          RewardedAd? _rewardedAd;
-          bool _isAdLoaded = false;
 
-          final String _adUnitId = 'ca-app-pub-3940256099942544/5224354917';
-
-          @override
-          void initState() {
-            super.initState();
-            _loadRewardedAd();
-          }
-
-          void _loadRewardedAd() {
-            RewardedAd.load(
-              adUnitId: _adUnitId,
-              request: const AdRequest(),
-              rewardedAdLoadCallback: RewardedAdLoadCallback(
-                onAdLoaded: (ad) {
-                  setState(() {
-                    _rewardedAd = ad;
-                    _isAdLoaded = true;
-                  });
-                },
-                onAdFailedToLoad: (error) {
-                  setState(() {
-                    _isAdLoaded = false;
-                  });
-                },
-              ),
-            );
-          }
-
-          void _showRewardedAd() {
-            if (_rewardedAd != null && _isAdLoaded) {
-              _rewardedAd!.show(
-                onUserEarnedReward: (AdWithoutView ad, RewardItem reward) {
-                  setState(() {
-                    _userPoints += 50;
-                    _userBalance = _userPoints / 100;
-                  });
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('مبروك! شاهدت الإعلان واكتسبت 50 نقطة 🎉'),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
-                },
-              );
-              _rewardedAd = null;
-              _isAdLoaded = false;
-              _loadRewardedAd();
-            } else {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('جاري تحميل الإعلان... حاول بعد ثوانٍ')),
-              );
-              _loadRewardedAd();
-            }
+          void _rewardUser(int points) {
+            setState(() {
+              _userPoints += points;
+              _userBalance = _userPoints / 100;
+            });
           }
 
           @override
           Widget build(BuildContext context) {
             return Scaffold(
-              appBar: AppBar(
-                title: const Text('CashClip - كاش كليب', style: TextStyle(fontWeight: FontWeight.bold)),
-                centerTitle: true,
-                backgroundColor: Colors.black26,
-              ),
-              body: Padding(
-                padding: const EdgeInsets.all(20.0),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Card(
-                      color: Colors.grey[900],
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                      child: Padding(
-                        padding: const EdgeInsets.all(20.0),
-                        child: Column(
-                          children: [
-                            const Text('رصيدك الحالي', style: TextStyle(fontSize: 18, color: Colors.grey)),
-                            const SizedBox(height: 10),
-                            Text('\$$_userBalance', style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: Colors.greenAccent)),
-                            const Divider(color: Colors.grey),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
+              body: SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 15.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: Colors.redAccent.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Icon(Icons.play_arrow_rounded, color: Colors.redAccent, size: 28),
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                'CashClip',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF1E1E28),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: Colors.amber.withOpacity(0.4)),
+                            ),
+                            child: Row(
                               children: [
-                                const Icon(Icons.stars, color: Colors.amber),
-                                const SizedBox(width: 8),
-                                Text('$_userPoints نقطة', style: const TextStyle(fontSize: 20)),
+                                const Icon(Icons.stars_rounded, color: Colors.amber, size: 20),
+                                const SizedBox(width: 6),
+                                Text(
+                                  '$_userPoints',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                ),
                               ],
+                            ),
+                          )
+                        ],
+                      ),
+                      
+                      const SizedBox(height: 30),
+
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(22.0),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF1F1C2C), Color(0xFF928DAB)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(24),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.4),
+                              blurRadius: 15,
+                              offset: const Offset(0, 8),
                             )
                           ],
                         ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('إجمالي أرباحك', style: TextStyle(fontSize: 16, color: Colors.white70)),
+                            const SizedBox(height: 8),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  '\$${_userBalance.toStringAsFixed(2)}',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 38,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.greenAccent,
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white10,
+                                    borderRadius: BorderRadius.circular(15),
+                                  ),
+                                  child: const Icon(Icons.account_balance_wallet_rounded, color: Colors.white, size: 28),
+                                )
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 40),
-                    ElevatedButton.icon(
-                      onPressed: _showRewardedAd,
-                      icon: Icon(_isAdLoaded ? Icons.play_circle_fill : Icons.hourglass_top, size: 30),
-                      label: Text(_isAdLoaded ? 'شاهد إعلان واكسب نقاط' : 'جاري تجهيز الإعلان...', style: const TextStyle(fontSize: 18)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 15),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+
+                      const SizedBox(height: 35),
+                      const Text(
+                        'منصات المشاهدة والربح',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 15),
+
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (context) => ShortsFeedScreen(
+                                  onRewardEarned: (pts) => _rewardUser(pts),
+                                ),
+                              ),
+                            );
+                          },
+                          child: Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(24),
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFF8A2387), Color(0xFFE94057), Color(0xFFF27121)],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              border: Border.all(color: Colors.white12),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(20.0),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black54,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Text('Shorts Feed', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  const Text(
+                                    'تصفح السكيتات والسكيتشات القصيرة',
+                                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  const Text(
+                                    'اسحب للأعلى للمشاهدة واكسب +50 نقطة لكل مقطع!',
+                                    style: TextStyle(fontSize: 13, color: Colors.white70),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             );
           }
         }
+
+        class ShortsFeedScreen extends StatefulWidget {
+          final Function(int) onRewardEarned;
+
+          const ShortsFeedScreen({super.key, required this.onRewardEarned});
+
+          @override
+          State<ShortsFeedScreen> createState() => _ShortsFeedScreenState();
+        }
+
+        class _ShortsFeedScreenState extends State<ShortsFeedScreen> {
+          final List<String> _videoIds = [
+            '2v8urS4Rgh4',
+            'L_LUpnjgPso',
+            'kxOPB4q8q7A',
+          ];
+
+          final PageController _pageController = PageController();
+
+          @override
+          Widget build(BuildContext context) {
+            return Scaffold(
+              backgroundColor: Colors.black,
+              body: Stack(
+                children: [
+                  PageView.builder(
+                    scrollDirection: Axis.vertical,
+                    controller: _pageController,
+                    itemCount: _videoIds.length,
+                    itemBuilder: (context, index) {
+                      return SingleShortItem(
+                        videoId: _videoIds[index],
+                        onVideoEnded: () {
+                          widget.onRewardEarned(50);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('تمت إضافة +50 نقطة لحسابك 🎉'),
+                              backgroundColor: Colors.green,
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
+
+                  Positioned(
+                    top: 40,
+                    left: 15,
+                    child: IconButton(
+                      icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 26),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+        }
+
+        class SingleShortItem extends StatefulWidget {
+          final String videoId;
+          final VoidCallback onVideoEnded;
+
+          const SingleShortItem({super.key, required this.videoId, required this.onVideoEnded});
+
+          @override
+          State<SingleShortItem> createState() => _SingleShortItemState();
+        }
+
+        class _SingleShortItemState extends State<SingleShortItem> {
+          late YoutubePlayerController _controller;
+          bool _rewarded = false;
+
+          @override
+          void initState() {
+            super.initState();
+            _controller = YoutubePlayerController(
+              initialVideoId: widget.videoId,
+              flags: const YoutubePlayerFlags(
+                autoPlay: true,
+                mute: false,
+                hideControls: true,
+                loop: false,
+              ),
+            )..addListener(() {
+                if (_controller.value.playerState == PlayerState.ended && !_rewarded) {
+                  _rewarded = true;
+                  widget.onVideoEnded();
+                }
+              });
+          }
+
+          @override
+          void dispose() {
+            _controller.dispose();
+            super.dispose();
+          }
+
+          @override
+          Widget build(BuildContext context) {
+            return Stack(
+              children: [
+                Center(
+                  child: YoutubePlayer(
+                    controller: _controller,
+                    showVideoProgressIndicator: true,
+                    progressIndicatorColor: Colors.redAccent,
+                  ),
+                ),
+                
+                Positioned(
+                  bottom: 30,
+                  right: 15,
+                  child: Column(
+                    children: [
+                      const Icon(Icons.favorite_rounded, color: Colors.white, size: 35),
+                      const SizedBox(height: 5),
+                      const Text('12.4K', style: TextStyle(fontSize: 12, color: Colors.white)),
+                      const SizedBox(height: 20),
+                      const Icon(Icons.monetization_on_rounded, color: Colors.amber, size: 35),
+                      const SizedBox(height: 5),
+                      const Text('+50', style: TextStyle(fontSize: 12, color: Colors.amber, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          }
+        }
         EOF
 
-    - name: Build APK File
-      run: |
-        cd app
         flutter build apk --release
 
-    - name: Upload APK Artifact
+    - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: CashClip-release-apk
+        name: CashClip-Pro-release-apk
         path: app/build/app/outputs/flutter-apk/app-release.apk
