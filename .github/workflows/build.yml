@@ -29,6 +29,9 @@ jobs:
         flutter create --org com.hasnawi.cashclip app
         cd app
         flutter pub add google_mobile_ads
+        
+        # Adjust minSdkVersion for Google Mobile Ads compatibility
+        sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/g' android/app/build.gradle
 
     - name: Inject Application Code
       run: |
