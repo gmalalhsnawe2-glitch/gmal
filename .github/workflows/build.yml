@@ -1,23 +1,16 @@
-# ==============================================================================
-# Enterprise CI/CD Automated Workflow for CashClip Pro
-# Engine: Flutter / Dart Cross-Platform Mobile Engine
-# Target Platforms: Android (APK / AAB)
-# Architecture: High-Reliability Multi-Stage Pipeline
-# ==============================================================================
-
 name: Enterprise CashClip Pro Master Build Pipeline
 
 on:
   push:
     branches:
-      - "main"
-      - "master"
+      - main
+      - master
       - "release/**"
       - "dev/**"
   pull_request:
     branches:
-      - "main"
-      - "master"
+      - main
+      - master
   workflow_dispatch:
     inputs:
       build_mode:
@@ -26,8 +19,8 @@ on:
         default: "release"
         type: choice
         options:
-          - "release"
-          - "debug"
+          - release
+          - debug
 
 permissions:
   contents: read
@@ -46,25 +39,12 @@ env:
   FLUTTER_CHANNEL: 'stable'
 
 jobs:
-  # ==============================================================================
-  # Stage 1: Environment & Project Sanity Pre-Checks
-  # ==============================================================================
   environment_sanity_check:
     name: 01. Environment & Config Validation
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Source Code Repository
         uses: actions/checkout@v4
-
-      - name: Log Execution Environment Context
-        run: |
-          echo "================================================================="
-          echo "Initiating Pre-flight Sanity Checks for CashClip Pro Build System"
-          echo "Repository Name : ${{ github.repository }}"
-          echo "Target Commit   : ${{ github.sha }}"
-          echo "Triggering Event: ${{ github.event_name }}"
-          echo "Ref Branch Name : ${{ github.ref }}"
-          echo "================================================================="
 
       - name: Validate Flutter Manifest Presence
         run: |
@@ -84,9 +64,6 @@ jobs:
             exit 1
           fi
 
-  # ==============================================================================
-  # Stage 2: Code Quality, Static Analysis & Testing
-  # ==============================================================================
   quality_and_security_audit:
     name: 02. Quality, Lint & Security Audit
     needs: environment_sanity_check
@@ -112,18 +89,8 @@ jobs:
         run: flutter pub get
 
       - name: Perform Static Code Analysis
-        run: |
-          echo "Running Flutter Analyze Engine..."
-          flutter analyze --no-fatal-warnings || true
+        run: flutter analyze --no-fatal-warnings || true
 
-      - name: Execute Unit & Widget Tests
-        run: |
-          echo "Executing test suite..."
-          flutter test --coverage || true
-
-  # ==============================================================================
-  # Stage 3: Android Release Artifacts Construction (APK & AAB)
-  # ==============================================================================
   build_android_release_bundle:
     name: 03. Android Compilation & Packaging
     needs: quality_and_security_audit
@@ -148,51 +115,14 @@ jobs:
           channel: ${{ env.FLUTTER_CHANNEL }}
           cache: true
 
-      - name: Print Runtime Toolchain Information
-        run: |
-          echo "================================================================="
-          echo "Verified Active Toolchain Information:"
-          java -version
-          flutter --version
-          dart --version
-          echo "================================================================="
-
       - name: Purge Workspace Build Cache
         run: flutter clean
 
       - name: Fetch Fresh Pub Packages
         run: flutter pub get
 
-      - name: Safe Gradle Configuration Check
-        run: |
-          echo "Checking Gradle scripts existence..."
-          if [ -f "android/app/build.gradle" ]; then
-            echo "Groovy Build Script Detected at android/app/build.gradle"
-          elif [ -f "android/app/build.gradle.kts" ]; then
-            echo "Kotlin DSL Build Script Detected at android/app/build.gradle.kts"
-          else
-            echo "Warning: Non-standard Gradle script configuration found."
-          fi
-
       - name: Compile Universal Release APK
         run: flutter build apk --release --no-tree-shake-icons
-
-      - name: Compile Split ABIs Release APKs
-        run: flutter build apk --split-per-abi --release --no-tree-shake-icons || true
-
-      - name: Compile App Bundle (Google Play Store AAB)
-        run: flutter build appbundle --release || true
-
-      - name: Verify Generated Binary Artifacts
-        run: |
-          APK_FILE="build/app/outputs/flutter-apk/app-release.apk"
-          if [ -f "$APK_FILE" ]; then
-            echo "SUCCESS: Master Release APK created successfully at $APK_FILE"
-            ls -lh "$APK_FILE"
-          else
-            echo "FATAL ERROR: Release APK was not generated!"
-            exit 1
-          fi
 
       - name: Upload Universal APK Artifact
         uses: actions/upload-artifact@v4
@@ -200,45 +130,3 @@ jobs:
           name: CashClipPro-Universal-APK
           path: build/app/outputs/flutter-apk/app-release.apk
           retention-days: 14
-
-      - name: Upload Split Architecture APKs
-        uses: actions/upload-artifact@v4
-        with:
-          name: CashClipPro-Split-APKs
-          path: build/app/outputs/flutter-apk/app-*.apk
-          retention-days: 14
-
-      - name: Upload App Bundle (AAB) Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: CashClipPro-GooglePlay-AAB
-          path: build/app/outputs/bundle/release/app-release.aab
-          retention-days: 14
-
-  # ==============================================================================
-  # Stage 4: Execution Reporting and Pipeline Telemetry
-  # ==============================================================================
-  pipeline_summary_report:
-    name: 04. Pipeline Completion Report
-    needs: [environment_sanity_check, quality_and_security_audit, build_android_release_bundle]
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-      - name: Generate Pipeline Run Telemetry Summary
-        run: |
-          echo "================================================================="
-          echo "CASHCLIP PRO CI/CD PIPELINE EXECUTION SUMMARY"
-          echo "-----------------------------------------------------------------"
-          echo "Stage 1: Pre-check Status  : ${{ needs.environment_sanity_check.result }}"
-          echo "Stage 2: Audit Status      : ${{ needs.quality_and_security_audit.result }}"
-          echo "Stage 3: Build Job Status  : ${{ needs.build_android_release_bundle.result }}"
-          echo "================================================================="
-
-      - name: Assert Final Status Outcome
-        run: |
-          if [ "${{ needs.build_android_release_bundle.result }}" == "success" ]; then
-            echo "CI/CD SUCCESS: CashClip Pro APK/AAB Binaries are Ready for Deployment."
-          else
-            echo "CI/CD FAILURE: Pipeline stopped with errors during execution."
-            exit 1
-          fi
