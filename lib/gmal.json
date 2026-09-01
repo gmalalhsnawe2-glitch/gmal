@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "263691400591",
+    "project_id": "skipcash-3ce54",
+    "storage_bucket": "skipcash-3ce54.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:263691400591:android:e23750370ea5f1a0fd07fa",
+        "android_client_info": {
+          "package_name": "com.example.skipcash"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBLyG0vtpJywGnO65Vis2aKgKXFLzImkdY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
