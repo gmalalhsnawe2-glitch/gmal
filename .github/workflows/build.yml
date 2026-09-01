@@ -1,0 +1,193 @@
+name: Build CashClip APK
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'zulu'
+        java-version: '17'
+
+    - name: Set up Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.19.0'
+        channel: 'stable'
+
+    - name: Create Clean App
+      run: |
+        rm -rf *
+        flutter create --org com.hasnawi.cashclip .
+        flutter pub add google_mobile_ads
+
+    - name: Inject CashClip Code
+      run: |
+        cat << 'EOF' > lib/main.dart
+        import 'package:flutter/material.dart';
+        import 'package:google_mobile_ads/google_mobile_ads.dart';
+
+        void main() {
+          WidgetsFlutterBinding.ensureInitialized();
+          MobileAds.instance.initialize();
+          runApp(const CashClipApp());
+        }
+
+        class CashClipApp extends StatelessWidget {
+          const CashClipApp({super.key});
+
+          @override
+          Widget build(BuildContext context) {
+            return MaterialApp(
+              title: 'CashClip',
+              debugShowCheckedModeBanner: false,
+              theme: ThemeData(
+                scaffoldBackgroundColor: const Color(0xFF121212),
+                brightness: Brightness.dark,
+              ),
+              home: const MainHomeScreen(),
+            );
+          }
+        }
+
+        class MainHomeScreen extends StatefulWidget {
+          const MainHomeScreen({super.key});
+
+          @override
+          State<MainHomeScreen> createState() => _MainHomeScreenState();
+        }
+
+        class _MainHomeScreenState extends State<MainHomeScreen> {
+          int _userPoints = 1250;
+          double _userBalance = 12.50;
+          RewardedAd? _rewardedAd;
+          bool _isAdLoaded = false;
+
+          final String _adUnitId = 'ca-app-pub-3940256099942544/5224354917';
+
+          @override
+          void initState() {
+            super.initState();
+            _loadRewardedAd();
+          }
+
+          void _loadRewardedAd() {
+            RewardedAd.load(
+              adUnitId: _adUnitId,
+              request: const AdRequest(),
+              rewardedAdLoadCallback: RewardedAdLoadCallback(
+                onAdLoaded: (ad) {
+                  setState(() {
+                    _rewardedAd = ad;
+                    _isAdLoaded = true;
+                  });
+                },
+                onAdFailedToLoad: (error) {
+                  setState(() {
+                    _isAdLoaded = false;
+                  });
+                },
+              ),
+            );
+          }
+
+          void _showRewardedAd() {
+            if (_rewardedAd != null && _isAdLoaded) {
+              _rewardedAd!.show(
+                onUserEarnedReward: (AdWithoutView ad, RewardItem reward) {
+                  setState(() {
+                    _userPoints += 50;
+                    _userBalance = _userPoints / 100;
+                  });
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('مبروك! شاهدت الإعلان واكتسبت 50 نقطة 🎉'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                },
+              );
+              _rewardedAd = null;
+              _isAdLoaded = false;
+              _loadRewardedAd();
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('جاري تحميل الإعلان... حاول بعد ثوانٍ')),
+              );
+              _loadRewardedAd();
+            }
+          }
+
+          @override
+          Widget build(BuildContext context) {
+            return Scaffold(
+              appBar: AppBar(
+                title: const Text('CashClip - كاش كليب', style: TextStyle(fontWeight: FontWeight.bold)),
+                centerTitle: true,
+                backgroundColor: Colors.black26,
+              ),
+              body: Padding(
+                padding: const EdgeInsets.all(20.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Card(
+                      color: Colors.grey[900],
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                      child: Padding(
+                        padding: const EdgeInsets.all(20.0),
+                        child: Column(
+                          children: [
+                            const Text('رصيدك الحالي', style: TextStyle(fontSize: 18, color: Colors.grey)),
+                            const SizedBox(height: 10),
+                            Text('\$$_userBalance', style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: Colors.greenAccent)),
+                            const Divider(color: Colors.grey),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.stars, color: Colors.amber),
+                                const SizedBox(width: 8),
+                                Text('$_userPoints نقطة', style: const TextStyle(fontSize: 20)),
+                              ],
+                            )
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 40),
+                    ElevatedButton.icon(
+                      onPressed: _showRewardedAd,
+                      icon: Icon(_isAdLoaded ? Icons.play_circle_fill : Icons.hourglass_top, size: 30),
+                      label: Text(_isAdLoaded ? 'شاهد إعلان واكسب نقاط' : 'جاري تجهيز الإعلان...', style: const TextStyle(fontSize: 18)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 15),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+        }
+        EOF
+
+    - name: Build APK
+      run: flutter build apk --release --no-tree-shake-icons
+
+    - name: Upload APK Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: CashClip-release-apk
+        path: build/app/outputs/flutter-apk/app-release.apk
