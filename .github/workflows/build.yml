@@ -24,15 +24,15 @@ jobs:
         flutter-version: '3.19.0'
         channel: 'stable'
 
-    - name: Create Clean App
+    - name: Initialize Project
       run: |
-        rm -rf *
-        flutter create --org com.hasnawi.cashclip .
+        flutter create --org com.hasnawi.cashclip app
+        cd app
         flutter pub add google_mobile_ads
 
-    - name: Inject CashClip Code
+    - name: Inject Application Code
       run: |
-        cat << 'EOF' > lib/main.dart
+        cat << 'EOF' > app/lib/main.dart
         import 'package:flutter/material.dart';
         import 'package:google_mobile_ads/google_mobile_ads.dart';
 
@@ -184,10 +184,12 @@ jobs:
         EOF
 
     - name: Build APK
-      run: flutter build apk --release --no-tree-shake-icons
+      run: |
+        cd app
+        flutter build apk --release --no-tree-shake-icons
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
       with:
         name: CashClip-release-apk
-        path: build/app/outputs/flutter-apk/app-release.apk
+        path: app/build/app/outputs/flutter-apk/app-release.apk
