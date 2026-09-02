@@ -7,11 +7,20 @@ import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'theme/app_colors.dart';
 
-void main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
-  MobileAds.instance.initialize();
   runApp(const SkipCashApp());
+  
+  _initServices();
+}
+
+Future<void> _initServices() async {
+  try {
+    await Firebase.initializeApp();
+    await MobileAds.instance.initialize();
+  } catch (e) {
+    debugPrint("Initialization Error: $e");
+  }
 }
 
 class SkipCashApp extends StatelessWidget {
@@ -60,15 +69,19 @@ class _VideoWatchDashboardState extends State<VideoWatchDashboard> {
   }
 
   void _loadUserPointsFromFirebase() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
-      if (doc.exists) {
-        setState(() {
-          _userPoints = doc.data()?['points'] ?? 0;
-        });
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+        if (doc.exists) {
+          setState(() {
+            _userPoints = doc.data()?['points'] ?? 0;
+          });
+        }
+      } else {
+        await FirebaseAuth.instance.signInAnonymously();
       }
-    }
+    } catch (_) {}
   }
 
   void _initYoutubePlayer() {
@@ -80,46 +93,50 @@ class _VideoWatchDashboardState extends State<VideoWatchDashboard> {
 
   void _onPlayerStateChange() {
     if (_youtubeController.value.isPlaying && !_isPlaying && !_rewardClaimed) {
-      _startRewardTimer();
+      _startTimer();
     } else if (!_youtubeController.value.isPlaying && _isPlaying) {
-      _pauseRewardTimer();
+      _pauseTimer();
     }
   }
 
-  void _startRewardTimer() {
+  void _startTimer() {
     setState(() => _isPlaying = true);
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_timerSeconds > 0) {
         setState(() => _timerSeconds--);
       } else {
         _timer?.cancel();
-        _addPointsToFirebase(50);
+        _claimReward();
       }
     });
   }
 
-  void _pauseRewardTimer() {
+  void _pauseTimer() {
     _timer?.cancel();
     setState(() => _isPlaying = false);
   }
 
-  void _addPointsToFirebase(int points) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-        'points': FieldValue.increment(points),
-      }, SetOptions(merge: true));
-    }
+  void _claimReward() async {
     setState(() {
-      _userPoints += points;
+      _userPoints += 50;
       _rewardClaimed = true;
       _isPlaying = false;
     });
 
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+          'points': _userPoints,
+          'lastUpdated': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      }
+    } catch (_) {}
+
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('تمت إضافة $points نقطة لحسابك بنجاح!'),
+        const SnackBar(
+          content: Text('مبروك! تم إضافة 50 نقطة لرصيدك 🎉'),
           backgroundColor: Colors.green,
         ),
       );
@@ -141,51 +158,54 @@ class _VideoWatchDashboardState extends State<VideoWatchDashboard> {
   @override
   void dispose() {
     _youtubeController.dispose();
-    _timer?.cancel();
     _bannerAd?.dispose();
+    _timer?.cancel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.backgroundColor,
       appBar: AppBar(
-        title: const Text('SkipCash | مشاهدة وإرتقاء', style: TextStyle(color: AppColors.textWhite)),
         backgroundColor: AppColors.cardBg,
+        title: const Text('SkipCash', style: TextStyle(color: AppColors.primaryGold, fontWeight: FontWeight.bold)),
         centerTitle: true,
       ),
       body: Column(
         children: [
           Container(
-            margin: const EdgeInsets.all(16),
             padding: const EdgeInsets.all(16),
+            margin: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: AppColors.cardBg,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('رصيدك في السيرفر', style: TextStyle(color: AppColors.textGrey, fontSize: 13)),
-                    const SizedBox(height: 4),
-                    Text('$_userPoints نقطة', style: const TextStyle(color: AppColors.textWhite, fontSize: 21, fontWeight: FontWeight.bold)),
+                    const Text('رصيدك الحالي', style: TextStyle(color: AppColors.textGrey, fontSize: 14)),
+                    Text('$_userPoints نقطة', style: const TextStyle(color: AppColors.primaryGold, fontSize: 22, fontWeight: FontWeight.bold)),
                   ],
                 ),
-                Column(
-                  children: [
-                    const Text('الوقت المتبقي', style: TextStyle(color: AppColors.textGrey, fontSize: 13)),
-                    const SizedBox(height: 4),
-                    Text('$_timerSeconds ثانية', style: TextStyle(color: _timerSeconds == 0 ? Colors.green : AppColors.primaryGold, fontSize: 21, fontWeight: FontWeight.bold)),
-                  ],
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: AppColors.backgroundColor,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '00:$_timerSeconds',
+                    style: const TextStyle(color: AppColors.textWhite, fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
                 ),
               ],
             ),
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(12),
               child: YoutubePlayer(
@@ -196,13 +216,12 @@ class _VideoWatchDashboardState extends State<VideoWatchDashboard> {
             ),
           ),
           const Spacer(),
-          if (_isBannerLoaded && _bannerAd != null)
+          if (_isBannerLoaded)
             SizedBox(
-              width: _bannerAd!.size.width.toDouble(),
               height: _bannerAd!.size.height.toDouble(),
+              width: _bannerAd!.size.width.toDouble(),
               child: AdWidget(ad: _bannerAd!),
             ),
-          const SizedBox(height: 10),
         ],
       ),
     );
