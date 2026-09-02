@@ -7,40 +7,230 @@ import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'theme/app_colors.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const SkipCashApp());
-  _initServices();
-}
-
-Future<void> _initServices() async {
   try {
     await Firebase.initializeApp();
     await MobileAds.instance.initialize();
   } catch (e) {
-    debugPrint("Init Error: $e");
+    debugPrint("Setup Error: $e");
   }
+  runApp(const SkipCashPro());
 }
 
-class SkipCashApp extends StatelessWidget {
-  const SkipCashApp({super.key});
+class SkipCashPro extends StatelessWidget {
+  const SkipCashPro({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'SkipCash Global',
+      title: 'SkipCash Global PRO',
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark().copyWith(
-        scaffoldBackgroundColor: AppColors.backgroundColor,
-        colorScheme: const ColorScheme.dark(primary: AppColors.primaryGold),
+        scaffoldBackgroundColor: const Color(0xFF0F0F0F),
+        primaryColor: AppColors.primaryGold,
+        colorScheme: const ColorScheme.dark(
+          primary: AppColors.primaryGold,
+          secondary: AppColors.primaryGold,
+        ),
       ),
-      home: const MainNavigationScreen(),
+      home: const AuthWrapper(),
     );
   }
 }
 
+// ---------------- 0. AUTH WRAPPER ----------------
+class AuthWrapper extends StatelessWidget {
+  const AuthWrapper({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator(color: AppColors.primaryGold)),
+          );
+        }
+        if (snapshot.hasData && snapshot.data != null) {
+          return MainNavigationScreen(user: snapshot.data!);
+        }
+        return const AuthScreen();
+      },
+    );
+  }
+}
+
+// ---------------- AUTH SCREEN (LOGIN / SIGNUP) ----------------
+class AuthScreen extends StatefulWidget {
+  const AuthScreen({super.key});
+
+  @override
+  State<AuthScreen> createState() => _AuthScreenState();
+}
+
+class _AuthScreenState extends State<AuthScreen> {
+  bool isLogin = true;
+  bool isLoading = false;
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _nameController = TextEditingController();
+
+  Future<void> _submit() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+    final name = _nameController.text.trim();
+
+    if (email.isEmpty || password.isEmpty || (!isLogin && name.isEmpty)) {
+      _showMsg("يرجى ملء كافة الحقول المطلوب");
+      return;
+    }
+
+    setState(() => isLoading = true);
+
+    try {
+      if (isLogin) {
+        await FirebaseAuth.instance.signInWithEmailAndPassword(
+          email: email,
+          password: password,
+        );
+      } else {
+        UserCredential cred = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+          email: email,
+          password: password,
+        );
+        await cred.user?.updateDisplayName(name);
+        await FirebaseFirestore.instance.collection('users').doc(cred.user!.uid).set({
+          'name': name,
+          'email': email,
+          'points': 0,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      }
+    } on FirebaseAuthException catch (e) {
+      _showMsg(e.message ?? "حدث خطأ في التسجيل");
+    } catch (e) {
+      _showMsg("حدث خطأ غير متوقع");
+    } finally {
+      if (mounted) setState(() => isLoading = false);
+    }
+  }
+
+  void _showMsg(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(msg), backgroundColor: Colors.redAccent),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 25.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.stars_rounded, size: 80, color: AppColors.primaryGold),
+                const SizedBox(height: 10),
+                const Text(
+                  "SkipCash",
+                  style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AppColors.primaryGold),
+                ),
+                const Text(
+                  "شاهد وفز بالجوائز الحقيقية",
+                  style: TextStyle(color: Colors.grey, fontSize: 14),
+                ),
+                const SizedBox(height: 40),
+
+                Text(
+                  isLogin ? "تسجيل الدخول" : "إنشاء حساب جديد",
+                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 20),
+
+                if (!isLogin) ...[
+                  TextField(
+                    controller: _nameController,
+                    decoration: InputDecoration(
+                      labelText: "الاسم الكامل",
+                      prefixIcon: const Icon(Icons.person, color: AppColors.primaryGold),
+                      filled: true,
+                      fillColor: const Color(0xFF1A1A1A),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                  const SizedBox(height: 15),
+                ],
+
+                TextField(
+                  controller: _emailController,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: InputDecoration(
+                    labelText: "البريد الإلكتروني",
+                    prefixIcon: const Icon(Icons.email, color: AppColors.primaryGold),
+                    filled: true,
+                    fillColor: const Color(0xFF1A1A1A),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+                const SizedBox(height: 15),
+
+                TextField(
+                  controller: _passwordController,
+                  obscureText: true,
+                  decoration: InputDecoration(
+                    labelText: "كلمة المرور",
+                    prefixIcon: const Icon(Icons.lock, color: AppColors.primaryGold),
+                    filled: true,
+                    fillColor: const Color(0xFF1A1A1A),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+                const SizedBox(height: 25),
+
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    onPressed: isLoading ? null : _submit,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryGold,
+                      foregroundColor: Colors.black,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: isLoading
+                        ? const CircularProgressIndicator(color: Colors.black)
+                        : Text(
+                            isLogin ? "دخول" : "إنشاء الحساب",
+                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          ),
+                  ),
+                ),
+                const SizedBox(height: 15),
+
+                TextButton(
+                  onPressed: () => setState(() => isLogin = !isLogin),
+                  child: Text(
+                    isLogin ? "ليس لديك حساب؟ سجل الآن" : "لديك حساب بالفعل؟ سجل دخولك",
+                    style: const TextStyle(color: AppColors.primaryGold),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------- MAIN NAVIGATION ----------------
 class MainNavigationScreen extends StatefulWidget {
-  const MainNavigationScreen({super.key});
+  final User user;
+  const MainNavigationScreen({super.key, required this.user});
 
   @override
   State<MainNavigationScreen> createState() => _MainNavigationScreenState();
@@ -48,121 +238,58 @@ class MainNavigationScreen extends StatefulWidget {
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _currentIndex = 0;
-  int _userPoints = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadUserPoints();
-  }
-
-  void _loadUserPoints() async {
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
-        if (doc.exists) {
-          setState(() {
-            _userPoints = doc.data()?['points'] ?? 0;
-          });
-        }
-      } else {
-        await FirebaseAuth.instance.signInAnonymously();
-      }
-    } catch (_) {}
-  }
-
-  void _addPoints(int amount) async {
-    setState(() {
-      _userPoints += amount;
-    });
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-          'points': _userPoints,
-          'lastUpdated': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
-      }
-    } catch (_) {}
-  }
 
   @override
   Widget build(BuildContext context) {
     final List<Widget> pages = [
-      TikTokVideoFeed(onRewardEarned: () => _addPoints(50)),
-      AdRewardScreen(onRewardEarned: (pts) => _addPoints(pts)),
-      WalletScreen(userPoints: _userPoints, onDeductPoints: (pts) => _addPoints(-pts)),
-      ProfileScreen(userPoints: _userPoints),
+      TikTokFeed(uid: widget.user.uid),
+      const AdRewardScreen(),
+      WalletScreen(uid: widget.user.uid),
+      ProfileScreen(user: widget.user),
     ];
 
     return Scaffold(
-      body: pages[_currentIndex],
+      body: IndexedStack(index: _currentIndex, children: pages),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: (index) => setState(() => _currentIndex = index),
         type: BottomNavigationBarType.fixed,
-        backgroundColor: AppColors.cardBg,
+        backgroundColor: const Color(0xFF1A1A1A),
         selectedItemColor: AppColors.primaryGold,
-        unselectedItemColor: AppColors.textGrey,
+        unselectedItemColor: Colors.grey,
+        showUnselectedLabels: true,
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.play_circle_fill), label: 'الفيديوهات'),
-          BottomNavigationBarItem(icon: Icon(Icons.ads_click), label: 'الإعلانات'),
-          BottomNavigationBarItem(icon: Icon(Icons.account_balance_wallet), label: 'المحفظة'),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'حسابي'),
+          BottomNavigationBarItem(icon: Icon(Icons.slow_motion_video_rounded), label: 'اكتشف'),
+          BottomNavigationBarItem(icon: Icon(Icons.ads_click_rounded), label: 'المهام'),
+          BottomNavigationBarItem(icon: Icon(Icons.wallet_giftcard_rounded), label: 'المحفظة'),
+          BottomNavigationBarItem(icon: Icon(Icons.person_pin_rounded), label: 'حسابي'),
         ],
       ),
     );
   }
 }
 
-// ---------------- 1. TIKTOK / REELS FEED ----------------
-class TikTokVideoFeed extends StatefulWidget {
-  final VoidCallback onRewardEarned;
-  const TikTokVideoFeed({super.key, required this.onRewardEarned});
-
-  @override
-  State<TikTokVideoFeed> createState() => _TikTokVideoFeedState();
-}
-
-class _TikTokVideoFeedState extends State<TikTokVideoFeed> {
-  final List<String> _videoIds = [
-    "dQw4w9WgXcQ",
-    "L_LUpnjgPso",
-    "3JZ_D3ELwOQ",
-    "fJ9rUzIMcZQ",
-  ];
-
-  final PageController _pageController = PageController();
+// ---------------- 1. TIKTOK REELS FEED PRO ----------------
+class TikTokFeed extends StatelessWidget {
+  final String uid;
+  const TikTokFeed({super.key, required this.uid});
 
   @override
   Widget build(BuildContext context) {
+    final List<String> videoIds = ["dQw4w9WgXcQ", "L_LUpnjgPso", "3JZ_D3ELwOQ"];
+
     return PageView.builder(
       scrollDirection: Axis.vertical,
-      controller: _pageController,
-      itemCount: _videoIds.length,
-      itemBuilder: (context, index) {
-        return TikTokVideoCard(
-          videoId: _videoIds[index],
-          videoIndex: index + 1,
-          onRewardEarned: widget.onRewardEarned,
-        );
-      },
+      itemCount: videoIds.length,
+      itemBuilder: (context, index) => TikTokVideoCard(videoId: videoIds[index], uid: uid),
     );
   }
 }
 
 class TikTokVideoCard extends StatefulWidget {
   final String videoId;
-  final int videoIndex;
-  final VoidCallback onRewardEarned;
-
-  const TikTokVideoCard({
-    super.key,
-    required this.videoId,
-    required this.videoIndex,
-    required this.onRewardEarned,
-  });
+  final String uid;
+  const TikTokVideoCard({super.key, required this.videoId, required this.uid});
 
   @override
   State<TikTokVideoCard> createState() => _TikTokVideoCardState();
@@ -170,323 +297,331 @@ class TikTokVideoCard extends StatefulWidget {
 
 class _TikTokVideoCardState extends State<TikTokVideoCard> {
   late YoutubePlayerController _controller;
-  int _timerSeconds = 30;
-  Timer? _timer;
-  bool _isPlaying = false;
-  bool _rewardClaimed = false;
+  int _timer = 30;
+  Timer? _countdown;
+  bool _earned = false;
 
   @override
   void initState() {
     super.initState();
     _controller = YoutubePlayerController(
       initialVideoId: widget.videoId,
-      flags: const YoutubePlayerFlags(autoPlay: false, mute: false),
-    )..addListener(_onPlayerState);
-  }
-
-  void _onPlayerState() {
-    if (_controller.value.isPlaying && !_isPlaying && !_rewardClaimed) {
-      _startTimer();
-    } else if (!_controller.value.isPlaying && _isPlaying) {
-      _pauseTimer();
-    }
+      flags: const YoutubePlayerFlags(autoPlay: false, mute: false, hideControls: true),
+    )..addListener(() {
+        if (_controller.value.isPlaying && _countdown == null && !_earned) {
+          _startTimer();
+        } else if (!_controller.value.isPlaying) {
+          _countdown?.cancel();
+          _countdown = null;
+        }
+      });
   }
 
   void _startTimer() {
-    setState(() => _isPlaying = true);
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_timerSeconds > 0) {
-        setState(() => _timerSeconds--);
+    _countdown = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (_timer > 0) {
+        if (mounted) setState(() => _timer--);
       } else {
-        _timer?.cancel();
-        _claimReward();
+        t.cancel();
+        _givePoints();
       }
     });
   }
 
-  void _pauseTimer() {
-    _timer?.cancel();
-    setState(() => _isPlaying = false);
-  }
-
-  void _claimReward() {
-    setState(() {
-      _rewardClaimed = true;
-      _isPlaying = false;
-    });
-    widget.onRewardEarned();
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('🎉 مبروك! ربحت 50 نقطة لمشاهدة الفيديو'), backgroundColor: Colors.green),
-      );
+  void _givePoints() async {
+    if (_earned || widget.uid.isEmpty) return;
+    _earned = true;
+    try {
+      await FirebaseFirestore.instance.collection('users').doc(widget.uid).set({
+        'points': FieldValue.increment(50),
+        'last_watch': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("🎉 مبروك! +50 نقطة"), backgroundColor: Colors.green));
+      }
+    } catch (e) {
+      debugPrint("Points Error: $e");
     }
   }
 
   @override
   void dispose() {
+    _countdown?.cancel();
     _controller.dispose();
-    _timer?.cancel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Stack(
+      fit: StackFit.expand,
       children: [
-        Center(
-          child: YoutubePlayer(
-            controller: _controller,
-            showVideoProgressIndicator: true,
-            progressIndicatorColor: AppColors.primaryGold,
-          ),
-        ),
+        YoutubePlayer(controller: _controller),
         Positioned(
-          top: 50,
-          right: 20,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(20)),
-            child: Text('00:$_timerSeconds', style: const TextStyle(color: AppColors.primaryGold, fontSize: 18, fontWeight: FontWeight.bold)),
+          right: 15,
+          bottom: 100,
+          child: Column(
+            children: [
+              _sideIcon(Icons.favorite, "1.2k"),
+              const SizedBox(height: 20),
+              _sideIcon(Icons.comment, "450"),
+              const SizedBox(height: 20),
+              _sideIcon(Icons.share, "مشاركة"),
+            ],
           ),
         ),
         Positioned(
           top: 50,
           left: 20,
-          child: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(10)),
-            child: Text('فيديو #${widget.videoIndex}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          right: 20,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(20)),
+                child: Text("00:$_timer", style: const TextStyle(color: AppColors.primaryGold, fontWeight: FontWeight.bold)),
+              ),
+              const Icon(Icons.verified, color: AppColors.primaryGold),
+            ],
           ),
         ),
       ],
     );
   }
-}
 
-// ---------------- 2. AD REWARD CENTER ----------------
-class AdRewardScreen extends StatefulWidget {
-  final Function(int) onRewardEarned;
-  const AdRewardScreen({super.key, required this.onRewardEarned});
-
-  @override
-  State<AdRewardScreen> createState() => _AdRewardScreenState();
-}
-
-class _AdRewardScreenState extends State<AdRewardScreen> {
-  RewardedAd? _rewardedAd;
-  bool _isAdReady = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadRewardedAd();
-  }
-
-  void _loadRewardedAd() {
-    RewardedAd.load(
-      adUnitId: 'ca-app-pub-3940256099942544/5224354917',
-      request: const AdRequest(),
-      rewardedAdLoadCallback: RewardedAdLoadCallback(
-        onAdLoaded: (ad) {
-          setState(() {
-            _rewardedAd = ad;
-            _isAdReady = true;
-          });
-        },
-        onAdFailedToLoad: (error) {
-          setState(() => _isAdReady = false);
-        },
-      ),
+  Widget _sideIcon(IconData icon, String label) {
+    return Column(
+      children: [
+        Icon(icon, color: Colors.white, size: 35),
+        Text(label, style: const TextStyle(color: Colors.white, fontSize: 12)),
+      ],
     );
   }
+}
 
-  void _showAd() {
-    if (_rewardedAd != null) {
-      _rewardedAd!.show(onUserEarnedReward: (ad, reward) {
-        widget.onRewardEarned(100);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('🎉 حصلت على 100 نقطة لمشاهدة الإعلان!'), backgroundColor: Colors.green),
-        );
-        _loadRewardedAd();
-      });
-    }
-  }
+// ---------------- 2. AD REWARD SCREEN ----------------
+class AdRewardScreen extends StatelessWidget {
+  const AdRewardScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('مركز الإعلانات والربح'), backgroundColor: AppColors.cardBg),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            Card(
-              color: AppColors.cardBg,
-              child: ListTile(
-                leading: const Icon(Icons.video_library, color: AppColors.primaryGold, size: 36),
-                title: const Text('شاهد إعلان مكافأة'),
-                subtitle: const Text('ربح +100 نقطة عن كل إعلان كامل'),
-                trailing: ElevatedButton(
-                  onPressed: _isAdReady ? _showAd : null,
-                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryGold),
-                  child: Text(_isAdReady ? 'مشاهدة' : 'تحميل...'),
+      appBar: AppBar(title: const Text("المهام اليومية"), centerTitle: true, elevation: 0, backgroundColor: Colors.transparent),
+      body: ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          _adTaskCard("شاهد إعلان فيديو مكافأة", "+100 نقطة", Icons.play_lesson_rounded),
+          const SizedBox(height: 15),
+          _adTaskCard("تثبيت تطبيق مقترح", "+500 نقطة", Icons.download_for_offline_rounded),
+        ],
+      ),
+    );
+  }
+
+  Widget _adTaskCard(String title, String reward, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(color: const Color(0xFF1E1E1E), borderRadius: BorderRadius.circular(15)),
+      child: Row(
+        children: [
+          Icon(icon, color: AppColors.primaryGold, size: 40),
+          const SizedBox(width: 20),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title), Text(reward, style: const TextStyle(color: AppColors.primaryGold))])),
+          const Icon(Icons.arrow_forward_ios_rounded, size: 15),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------- 3. WALLET PRO WITH HISTORY ----------------
+class WalletScreen extends StatelessWidget {
+  final String uid;
+  const WalletScreen({super.key, required this.uid});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("المحفظة"), centerTitle: true, backgroundColor: Colors.transparent, elevation: 0),
+      body: StreamBuilder<DocumentSnapshot>(
+        stream: FirebaseFirestore.instance.collection('users').doc(uid).snapshots(),
+        builder: (context, snapshot) {
+          int points = 0;
+          if (snapshot.hasData && snapshot.data!.exists) {
+            points = (snapshot.data!.data() as Map<String, dynamic>)['points'] ?? 0;
+          }
+          return Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              children: [
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(30),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(colors: [Color(0xFFD4AF37), Color(0xFF8A6E2F)]),
+                    borderRadius: BorderRadius.circular(25),
+                  ),
+                  child: Column(
+                    children: [
+                      const Text("رصيدك الحالي بالدولار", style: TextStyle(color: Colors.white70)),
+                      Text("\$${(points / 1000).toStringAsFixed(2)}", style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold)),
+                      Text("$points نقطة", style: const TextStyle(color: Colors.white)),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 30),
+                const Align(alignment: Alignment.centerRight, child: Text("سجل السحوبات الأخيرة", style: TextStyle(fontWeight: FontWeight.bold))),
+                const SizedBox(height: 10),
+                Expanded(
+                  child: StreamBuilder<QuerySnapshot>(
+                    stream: FirebaseFirestore.instance.collection('withdrawals').where('userId', isEqualTo: uid).snapshots(),
+                    builder: (context, subSnapshot) {
+                      if (!subSnapshot.hasData) return const Center(child: CircularProgressIndicator());
+                      if (subSnapshot.data!.docs.isEmpty) {
+                        return const Center(child: Text("لا توجد عمليات سحب سابقة", style: TextStyle(color: Colors.grey)));
+                      }
+                      return ListView.builder(
+                        itemCount: subSnapshot.data!.docs.length,
+                        itemBuilder: (context, i) {
+                          var doc = subSnapshot.data!.docs[i];
+                          return ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: Text("سحب ${doc['method'] ?? 'زين كاش'}"),
+                            subtitle: Text(doc['status'] == 'Pending' ? "قيد المعالجة" : "تم الدفع ✅"),
+                            trailing: Text("\$${doc['amountUSD'] ?? '1.00'}", style: const TextStyle(color: AppColors.primaryGold)),
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ---------------- 4. PROFILE PRO SCREEN ----------------
+class ProfileScreen extends StatelessWidget {
+  final User user;
+  const ProfileScreen({super.key, required this.user});
+
+  @override
+  Widget build(BuildContext context) {
+    String name = user.displayName ?? 'مستخدم SkipCash';
+    String email = user.email ?? '';
+
+    return Scaffold(
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20.0),
+          child: Column(
+            children: [
+              const SizedBox(height: 70),
+              const CircleAvatar(
+                radius: 45,
+                backgroundColor: AppColors.primaryGold,
+                child: Icon(Icons.person, size: 55, color: Colors.black),
+              ),
+              const SizedBox(height: 12),
+              Text(name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+              const SizedBox(height: 4),
+              Text(email, style: const TextStyle(color: Colors.grey, fontSize: 13)),
+              const SizedBox(height: 6),
+              const Text("عضو ذهبي 🏆", style: TextStyle(color: AppColors.primaryGold, fontSize: 13, fontWeight: FontWeight.w600)),
+              
+              const SizedBox(height: 30),
+
+              // Developer Card
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF2C2512), Color(0xFF1A1A1A)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.primaryGold.withOpacity(0.4), width: 1),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primaryGold.withOpacity(0.05),
+                      blurRadius: 10,
+                      spreadRadius: 2,
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryGold.withOpacity(0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.code_rounded, color: AppColors.primaryGold, size: 28),
+                    ),
+                    const SizedBox(width: 15),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: const [
+                          Text("مطور التطبيق", style: TextStyle(color: Colors.grey, fontSize: 12)),
+                          SizedBox(height: 2),
+                          Text("جمال الحسناوي", style: TextStyle(color: AppColors.primaryGold, fontSize: 17, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.verified_user_rounded, color: AppColors.primaryGold, size: 20),
+                  ],
                 ),
               ),
-            ),
-          ],
+
+              const SizedBox(height: 25),
+
+              _profileOption(Icons.headset_mic_rounded, "الدعم الفني", () {}),
+              _profileOption(Icons.share_rounded, "دعوة الأصدقاء", () {}),
+              _profileOption(Icons.info_outline_rounded, "حول التطبيق", () {}),
+              
+              // Logout Button
+              _profileOption(Icons.logout_rounded, "تسجيل الخروج", () async {
+                await FirebaseAuth.instance.signOut();
+              }, color: Colors.redAccent),
+
+              const SizedBox(height: 30),
+              const Text("SkipCash v2.0.0 Global Pro", style: TextStyle(color: Colors.grey, fontSize: 12)),
+              const SizedBox(height: 4),
+              Text(
+                "تطوير وتصميم جمال الحسناوي © جميع الحقوق محفوظة",
+                style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11),
+              ),
+              const SizedBox(height: 30),
+            ],
+          ),
         ),
+      ),
+    );
+  }
+
+  Widget _profileOption(IconData icon, String title, VoidCallback onTap, {Color? color}) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1A1A),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: ListTile(
+        leading: Icon(icon, color: color ?? AppColors.primaryGold),
+        title: Text(title, style: TextStyle(fontSize: 15, color: color ?? Colors.white)),
+        trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
+        onTap: onTap,
       ),
     );
   }
 }
 
-// ---------------- 3. WALLET & WITHDRAW SCREEN ----------------
-class WalletScreen extends StatefulWidget {
-  final int userPoints;
-  final Function(int) onDeductPoints;
-
-  const WalletScreen({super.key, required this.userPoints, required this.onDeductPoints});
-
-  @override
-  State<WalletScreen> createState() => _WalletScreenState();
-}
-
-class _WalletScreenState extends State<WalletScreen> {
-  String _selectedMethod = 'زين كاش';
-  final TextEditingController _accountController = TextEditingController();
-
-  void _submitWithdraw() async {
-    if (widget.userPoints < 1000) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text(r'عذراً، الحد الأدنى للسحب هو 1000 نقطة (1.00\$)'), backgroundColor: Colors.red),
-      );
-      return;
-    }
-
-    if (_accountController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('يرجى كتابة رقم الحساب أو المحفظة'), backgroundColor: Colors.orange),
-      );
-      return;
-    }
-
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        await FirebaseFirestore.instance.collection('withdrawals').add({
-          'userId': user.uid,
-          'method': _selectedMethod,
-          'account': _accountController.text.trim(),
-          'pointsSpent': 1000,
-          'amountUSD': 1.0,
-          'status': 'Pending',
-          'createdAt': FieldValue.serverTimestamp(),
-        });
-
-        widget.onDeductPoints(1000);
-        _accountController.clear();
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('تم إرسال طلب السحب بنجاح! سيتم التحويل قريباً.'), backgroundColor: Colors.green),
-          );
-        }
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('خطأ أثناء السحب: $e'), backgroundColor: Colors.red),
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    double usdBalance = widget.userPoints / 1000.0;
-
-    return Scaffold(
-      appBar: AppBar(title: const Text('المحفظة وسحب الأرباح'), backgroundColor: AppColors.cardBg),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(color: AppColors.cardBg, borderRadius: BorderRadius.circular(16)),
-              child: Column(
-                children: [
-                  const Text('رصيدك المالي الحالي', style: TextStyle(color: AppColors.textGrey)),
-                  const SizedBox(height: 8),
-                  Text('\$${usdBalance.toStringAsFixed(2)}', style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AppColors.primaryGold)),
-                  Text('${widget.userPoints} نقطة', style: const TextStyle(color: Colors.white70)),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-            const Text('اختر طريقة السحب:', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              value: _selectedMethod,
-              dropdownColor: AppColors.cardBg,
-              items: ['زين كاش', 'كارت كيش / آسيا / زين', 'Binance USDT']
-                  .map((m) => DropdownMenuItem(value: m, child: Text(m)))
-                  .toList(),
-              onChanged: (val) => setState(() => _selectedMethod = val!),
-              decoration: const InputDecoration(border: OutlineInputBorder()),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _accountController,
-              decoration: const InputDecoration(
-                labelText: 'رقم المحفظة / رقم الهاتف / عنوان المحفظة',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryGold),
-                onPressed: _submitWithdraw,
-                child: const Text(r'طلب سحب 1.00\$ (1000 نقطة)', style: TextStyle(fontSize: 16, color: Colors.black, fontWeight: FontWeight.bold)),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ---------------- 4. PROFILE & AUTH SCREEN ----------------
-class ProfileScreen extends StatelessWidget {
-  final int userPoints;
-  const ProfileScreen({super.key, required this.userPoints});
-
-  @override
-  Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
-
-    return Scaffold(
-      appBar: AppBar(title: const Text('الملف الشخصي'), backgroundColor: AppColors.cardBg),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            const CircleAvatar(radius: 40, backgroundColor: AppColors.primaryGold, child: Icon(Icons.person, size: 50, color: Colors.black)),
-            const SizedBox(height: 12),
-            Text('معرف المستخدِم: ${user?.uid.substring(0, 8) ?? "مجهول"}', style: const TextStyle(fontSize: 16, color: AppColors.textGrey)),
-            const SizedBox(height: 24),
-            ListTile(
-              tileColor: AppColors.cardBg,
-              title: const Text('مجموع النقاط المكتسبة'),
-              trailing: Text('$userPoints نقطة', style: const TextStyle(color: AppColors.primaryGold, fontWeight: FontWeight.bold)),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
