@@ -1,10 +1,35 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import '../theme/app_colors.dart';
+import 'theme/app_colors.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
+  MobileAds.instance.initialize();
+  runApp(const SkipCashApp());
+}
+
+class SkipCashApp extends StatelessWidget {
+  const SkipCashApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'SkipCash',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        scaffoldBackgroundColor: AppColors.backgroundColor,
+        fontFamily: 'Cairo',
+      ),
+      home: const VideoWatchDashboard(),
+    );
+  }
+}
 
 class VideoWatchDashboard extends StatefulWidget {
   const VideoWatchDashboard({super.key});
@@ -17,7 +42,7 @@ class _VideoWatchDashboardState extends State<VideoWatchDashboard> {
   late YoutubePlayerController _youtubeController;
   BannerAd? _bannerAd;
   bool _isBannerLoaded = false;
-  
+
   int _userPoints = 0;
   int _timerSeconds = 30;
   Timer? _timer;
@@ -81,20 +106,22 @@ class _VideoWatchDashboardState extends State<VideoWatchDashboard> {
   void _addPointsToFirebase(int points) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
-      final userRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
-      await userRef.set({
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
         'points': FieldValue.increment(points),
-        'lastUpdated': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
+    }
+    setState(() {
+      _userPoints += points;
+      _rewardClaimed = true;
+      _isPlaying = false;
+    });
 
-      setState(() {
-        _userPoints += points;
-        _rewardClaimed = true;
-        _isPlaying = false;
-      });
-
+    if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تمت إضافة $points نقطة لحسابك بنجاح!'), backgroundColor: Colors.green),
+        SnackBar(
+          content: Text('تمت إضافة $points نقطة لحسابك بنجاح!'),
+          backgroundColor: Colors.green,
+        ),
       );
     }
   }
@@ -122,9 +149,9 @@ class _VideoWatchDashboardState extends State<VideoWatchDashboard> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppColors.backgroundColor,
       appBar: AppBar(
-        title: const Text('SkipCash | مشاهدة وربح', style: TextStyle(color: AppColors.textWhite)),
+        title: const Text('SkipCash | مشاهدة وإرتقاء', style: TextStyle(color: AppColors.textWhite)),
         backgroundColor: AppColors.cardBg,
         centerTitle: true,
       ),
@@ -144,14 +171,14 @@ class _VideoWatchDashboardState extends State<VideoWatchDashboard> {
                   children: [
                     const Text('رصيدك في السيرفر', style: TextStyle(color: AppColors.textGrey, fontSize: 13)),
                     const SizedBox(height: 4),
-                    Text('$_userPoints نقطة', style: const TextStyle(color: AppColors.textWhite, fontSize: 20, fontWeight: FontWeight.bold)),
+                    Text('$_userPoints نقطة', style: const TextStyle(color: AppColors.textWhite, fontSize: 21, fontWeight: FontWeight.bold)),
                   ],
                 ),
                 Column(
                   children: [
                     const Text('الوقت المتبقي', style: TextStyle(color: AppColors.textGrey, fontSize: 13)),
                     const SizedBox(height: 4),
-                    Text('$_timerSeconds ثانية', style: TextStyle(color: _timerSeconds == 0 ? Colors.green : AppColors.primaryRed, fontSize: 20, fontWeight: FontWeight.bold)),
+                    Text('$_timerSeconds ثانية', style: TextStyle(color: _timerSeconds == 0 ? Colors.green : AppColors.primaryGold, fontSize: 21, fontWeight: FontWeight.bold)),
                   ],
                 ),
               ],
@@ -164,7 +191,7 @@ class _VideoWatchDashboardState extends State<VideoWatchDashboard> {
               child: YoutubePlayer(
                 controller: _youtubeController,
                 showVideoProgressIndicator: true,
-                progressIndicatorColor: AppColors.primaryRed,
+                progressIndicatorColor: AppColors.primaryGold,
               ),
             ),
           ),
@@ -181,3 +208,4 @@ class _VideoWatchDashboardState extends State<VideoWatchDashboard> {
     );
   }
 }
+
