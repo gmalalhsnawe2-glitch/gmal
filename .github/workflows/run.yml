@@ -34,6 +34,12 @@ jobs:
             cp android/app/google-services.json temp_app/android/app/
           fi
 
+      - name: Configure Manifest & AdMob App ID
+        run: |
+          MANIFEST_PATH="temp_app/android/app/src/main/AndroidManifest.xml"
+          ADMOB_META='<meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="ca-app-pub-3940256099942544~3347511713"/>'
+          sed -i "/<\/application>/i $ADMOB_META" $MANIFEST_PATH
+
       - name: Configure Kotlin & MultiDex
         run: |
           sed -i "s/ext.kotlin_version = .*/ext.kotlin_version = '1.9.20'/" temp_app/android/build.gradle
