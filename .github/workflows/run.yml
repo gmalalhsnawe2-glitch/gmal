@@ -10,46 +10,48 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Set up Java
-      uses: actions/setup-java@v3
-      with:
-        distribution: 'zulu'
-        java-version: '17'
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
 
-    - name: Set up Flutter
-      uses: subosito/flutter-action@v2
-      with:
-        flutter-version: '3.19.0'
-        channel: 'stable'
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.19.6'
+          channel: 'stable'
 
-    - name: Create Flutter Project Structure
-      run: |
-        flutter create temp_app --org com.skipcash.app
-        cp -r lib temp_app/
-        cp pubspec.yaml temp_app/
-        if [ -f "android/app/google-services.json" ]; then
-          cp android/app/google-services.json temp_app/android/app/
-        fi
+      - name: Create Flutter Project Structure
+        run: |
+          flutter create temp_app --org com.skipcash.app
+          cp -r lib temp_app/
+          cp pubspec.yaml temp_app/
+          if [ -f "android/app/google-services.json" ]; then
+            cp android/app/google-services.json temp_app/android/app/
+          fi
 
-    - name: Fix Kotlin Version
-      run: |
-        sed -i "s/ext.kotlin_version = .*/ext.kotlin_version = '1.9.0'/" temp_app/android/build.gradle
+      - name: Configure Kotlin & MultiDex
+        run: |
+          sed -i "s/ext.kotlin_version = .*/ext.kotlin_version = '1.9.20'/" temp_app/android/build.gradle
+          sed -i "s/minSdkVersion .*/minSdkVersion 21/" temp_app/android/app/build.gradle
+          sed -i "s/multiDexEnabled .*/multiDexEnabled true/" temp_app/android/app/build.gradle || true
 
-    - name: Install dependencies
-      run: |
-        cd temp_app
-        flutter pub get
+      - name: Install dependencies
+        run: |
+          cd temp_app
+          flutter pub get
 
-    - name: Build APK
-      run: |
-        cd temp_app
-        flutter build apk --release
+      - name: Build APK
+        run: |
+          cd temp_app
+          flutter build apk --release --no-tree-shake-icons
 
-    - name: Upload APK
-      uses: actions/upload-artifact@v4
-      with:
-        name: SkipCash-App
-        path: temp_app/build/app/outputs/flutter-apk/app-release.apk
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: SkipCash-App
+          path: temp_app/build/app/outputs/flutter-apk/app-release.apk
