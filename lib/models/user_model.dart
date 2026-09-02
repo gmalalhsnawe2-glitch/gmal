@@ -1,29 +1,27 @@
-import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart';
-import 'screens/login_screen.dart';
-import 'theme/app_colors.dart';
+class UserModel {
+  final String uid;
+  final String email;
+  final int points;
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
-  MobileAds.instance.initialize();
-  runApp(const SkipCashApp());
-}
+  UserModel({
+    required this.uid,
+    required this.email,
+    this.points = 0,
+  });
 
-class SkipCashApp extends StatelessWidget {
-  const SkipCashApp({super.key});
+  Map<String, dynamic> toMap() {
+    return {
+      'uid': uid,
+      'email': email,
+      'points': points,
+    };
+  }
 
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'SkipCash',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        scaffoldBackgroundColor: AppColors.background,
-        fontFamily: 'Cairo',
-      ),
-      home: const LoginScreen(),
+  factory UserModel.fromMap(Map<String, dynamic> map) {
+    return UserModel(
+      uid: map['uid'] ?? '',
+      email: map['email'] ?? '',
+      points: map['points'] ?? 0,
     );
   }
 }
