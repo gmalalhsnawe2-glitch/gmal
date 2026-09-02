@@ -358,7 +358,7 @@ class _WalletScreenState extends State<WalletScreen> {
   void _submitWithdraw() async {
     if (widget.userPoints < 1000) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('عذراً، الحد الأدنى للسحب هو 1000 نقطة ($1.00)'), backgroundColor: Colors.red),
+        const SnackBar(content: Text(r'عذراً، الحد الأدنى للسحب هو 1000 نقطة (1.00\$)'), backgroundColor: Colors.red),
       );
       return;
     }
@@ -450,7 +450,7 @@ class _WalletScreenState extends State<WalletScreen> {
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryGold),
                 onPressed: _submitWithdraw,
-                child: const Text('طلب سحب 1.00\$ (1000 نقطة)', style: TextStyle(fontSize: 16, color: Colors.black, fontWeight: FontWeight.bold)),
+                child: const Text(r'طلب سحب 1.00\$ (1000 نقطة)', style: TextStyle(fontSize: 16, color: Colors.black, fontWeight: FontWeight.bold)),
               ),
             ),
           ],
