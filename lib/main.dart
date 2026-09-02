@@ -5,7 +5,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
-import 'theme/app_colors.dart';
+
+// تعريف اللون الذهبي الرئيسي داخل الملف مباشرة لمنع أي خطأ في الملفات المفقودة
+const Color kPrimaryGold = Color(0xFFD4AF37);
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -13,7 +15,7 @@ void main() async {
     await Firebase.initializeApp();
     await MobileAds.instance.initialize();
   } catch (e) {
-    debugPrint("Setup Error: $e");
+    debugPrint("Initialization Error: $e");
   }
   runApp(const SkipCashPro());
 }
@@ -28,10 +30,10 @@ class SkipCashPro extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: const Color(0xFF0F0F0F),
-        primaryColor: AppColors.primaryGold,
+        primaryColor: kPrimaryGold,
         colorScheme: const ColorScheme.dark(
-          primary: AppColors.primaryGold,
-          secondary: AppColors.primaryGold,
+          primary: kPrimaryGold,
+          secondary: kPrimaryGold,
         ),
       ),
       home: const AuthWrapper(),
@@ -50,7 +52,8 @@ class AuthWrapper extends StatelessWidget {
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
-            body: Center(child: CircularProgressIndicator(color: AppColors.primaryGold)),
+            backgroundColor: Color(0xFF0F0F0F),
+            body: Center(child: CircularProgressIndicator(color: kPrimaryGold)),
           );
         }
         if (snapshot.hasData && snapshot.data != null) {
@@ -83,7 +86,7 @@ class _AuthScreenState extends State<AuthScreen> {
     final name = _nameController.text.trim();
 
     if (email.isEmpty || password.isEmpty || (!isLogin && name.isEmpty)) {
-      _showMsg("يرجى ملء كافة الحقول المطلوب");
+      _showMsg("يرجى ملء كافة الحقول المطلوبة");
       return;
     }
 
@@ -126,6 +129,7 @@ class _AuthScreenState extends State<AuthScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFF0F0F0F),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -133,11 +137,11 @@ class _AuthScreenState extends State<AuthScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.stars_rounded, size: 80, color: AppColors.primaryGold),
+                const Icon(Icons.stars_rounded, size: 80, color: kPrimaryGold),
                 const SizedBox(height: 10),
                 const Text(
                   "SkipCash",
-                  style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AppColors.primaryGold),
+                  style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: kPrimaryGold),
                 ),
                 const Text(
                   "شاهد وفز بالجوائز الحقيقية",
@@ -147,16 +151,18 @@ class _AuthScreenState extends State<AuthScreen> {
 
                 Text(
                   isLogin ? "تسجيل الدخول" : "إنشاء حساب جديد",
-                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
                 ),
                 const SizedBox(height: 20),
 
                 if (!isLogin) ...[
                   TextField(
                     controller: _nameController,
+                    style: const TextStyle(color: Colors.white),
                     decoration: InputDecoration(
                       labelText: "الاسم الكامل",
-                      prefixIcon: const Icon(Icons.person, color: AppColors.primaryGold),
+                      labelStyle: const TextStyle(color: Colors.grey),
+                      prefixIcon: const Icon(Icons.person, color: kPrimaryGold),
                       filled: true,
                       fillColor: const Color(0xFF1A1A1A),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -168,9 +174,11 @@ class _AuthScreenState extends State<AuthScreen> {
                 TextField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
+                  style: const TextStyle(color: Colors.white),
                   decoration: InputDecoration(
                     labelText: "البريد الإلكتروني",
-                    prefixIcon: const Icon(Icons.email, color: AppColors.primaryGold),
+                    labelStyle: const TextStyle(color: Colors.grey),
+                    prefixIcon: const Icon(Icons.email, color: kPrimaryGold),
                     filled: true,
                     fillColor: const Color(0xFF1A1A1A),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -181,9 +189,11 @@ class _AuthScreenState extends State<AuthScreen> {
                 TextField(
                   controller: _passwordController,
                   obscureText: true,
+                  style: const TextStyle(color: Colors.white),
                   decoration: InputDecoration(
                     labelText: "كلمة المرور",
-                    prefixIcon: const Icon(Icons.lock, color: AppColors.primaryGold),
+                    labelStyle: const TextStyle(color: Colors.grey),
+                    prefixIcon: const Icon(Icons.lock, color: kPrimaryGold),
                     filled: true,
                     fillColor: const Color(0xFF1A1A1A),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -197,7 +207,7 @@ class _AuthScreenState extends State<AuthScreen> {
                   child: ElevatedButton(
                     onPressed: isLoading ? null : _submit,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primaryGold,
+                      backgroundColor: kPrimaryGold,
                       foregroundColor: Colors.black,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
@@ -215,7 +225,7 @@ class _AuthScreenState extends State<AuthScreen> {
                   onPressed: () => setState(() => isLogin = !isLogin),
                   child: Text(
                     isLogin ? "ليس لديك حساب؟ سجل الآن" : "لديك حساب بالفعل؟ سجل دخولك",
-                    style: const TextStyle(color: AppColors.primaryGold),
+                    style: const TextStyle(color: kPrimaryGold),
                   ),
                 ),
               ],
@@ -255,7 +265,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         onTap: (index) => setState(() => _currentIndex = index),
         type: BottomNavigationBarType.fixed,
         backgroundColor: const Color(0xFF1A1A1A),
-        selectedItemColor: AppColors.primaryGold,
+        selectedItemColor: kPrimaryGold,
         unselectedItemColor: Colors.grey,
         showUnselectedLabels: true,
         items: const [
@@ -380,9 +390,9 @@ class _TikTokVideoCardState extends State<TikTokVideoCard> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(20)),
-                child: Text("00:$_timer", style: const TextStyle(color: AppColors.primaryGold, fontWeight: FontWeight.bold)),
+                child: Text("00:$_timer", style: const TextStyle(color: kPrimaryGold, fontWeight: FontWeight.bold)),
               ),
-              const Icon(Icons.verified, color: AppColors.primaryGold),
+              const Icon(Icons.verified, color: kPrimaryGold),
             ],
           ),
         ),
@@ -425,9 +435,9 @@ class AdRewardScreen extends StatelessWidget {
       decoration: BoxDecoration(color: const Color(0xFF1E1E1E), borderRadius: BorderRadius.circular(15)),
       child: Row(
         children: [
-          Icon(icon, color: AppColors.primaryGold, size: 40),
+          Icon(icon, color: kPrimaryGold, size: 40),
           const SizedBox(width: 20),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title), Text(reward, style: const TextStyle(color: AppColors.primaryGold))])),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title), Text(reward, style: const TextStyle(color: kPrimaryGold))])),
           const Icon(Icons.arrow_forward_ios_rounded, size: 15),
         ],
       ),
@@ -489,7 +499,7 @@ class WalletScreen extends StatelessWidget {
                             contentPadding: EdgeInsets.zero,
                             title: Text("سحب ${doc['method'] ?? 'زين كاش'}"),
                             subtitle: Text(doc['status'] == 'Pending' ? "قيد المعالجة" : "تم الدفع ✅"),
-                            trailing: Text("\$${doc['amountUSD'] ?? '1.00'}", style: const TextStyle(color: AppColors.primaryGold)),
+                            trailing: Text("\$${doc['amountUSD'] ?? '1.00'}", style: const TextStyle(color: kPrimaryGold)),
                           );
                         },
                       );
@@ -524,7 +534,7 @@ class ProfileScreen extends StatelessWidget {
               const SizedBox(height: 70),
               const CircleAvatar(
                 radius: 45,
-                backgroundColor: AppColors.primaryGold,
+                backgroundColor: kPrimaryGold,
                 child: Icon(Icons.person, size: 55, color: Colors.black),
               ),
               const SizedBox(height: 12),
@@ -532,7 +542,7 @@ class ProfileScreen extends StatelessWidget {
               const SizedBox(height: 4),
               Text(email, style: const TextStyle(color: Colors.grey, fontSize: 13)),
               const SizedBox(height: 6),
-              const Text("عضو ذهبي 🏆", style: TextStyle(color: AppColors.primaryGold, fontSize: 13, fontWeight: FontWeight.w600)),
+              const Text("عضو ذهبي 🏆", style: TextStyle(color: kPrimaryGold, fontSize: 13, fontWeight: FontWeight.w600)),
               
               const SizedBox(height: 30),
 
@@ -547,10 +557,10 @@ class ProfileScreen extends StatelessWidget {
                     end: Alignment.bottomRight,
                   ),
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.primaryGold.withOpacity(0.4), width: 1),
+                  border: Border.all(color: kPrimaryGold.withOpacity(0.4), width: 1),
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.primaryGold.withOpacity(0.05),
+                      color: kPrimaryGold.withOpacity(0.05),
                       blurRadius: 10,
                       spreadRadius: 2,
                     ),
@@ -561,10 +571,10 @@ class ProfileScreen extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: AppColors.primaryGold.withOpacity(0.15),
+                        color: kPrimaryGold.withOpacity(0.15),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.code_rounded, color: AppColors.primaryGold, size: 28),
+                      child: const Icon(Icons.code_rounded, color: kPrimaryGold, size: 28),
                     ),
                     const SizedBox(width: 15),
                     Expanded(
@@ -573,11 +583,11 @@ class ProfileScreen extends StatelessWidget {
                         children: const [
                           Text("مطور التطبيق", style: TextStyle(color: Colors.grey, fontSize: 12)),
                           SizedBox(height: 2),
-                          Text("جمال الحسناوي", style: TextStyle(color: AppColors.primaryGold, fontSize: 17, fontWeight: FontWeight.bold)),
+                          Text("جمال الحسناوي", style: TextStyle(color: kPrimaryGold, fontSize: 17, fontWeight: FontWeight.bold)),
                         ],
                       ),
                     ),
-                    const Icon(Icons.verified_user_rounded, color: AppColors.primaryGold, size: 20),
+                    const Icon(Icons.verified_user_rounded, color: kPrimaryGold, size: 20),
                   ],
                 ),
               ),
@@ -616,7 +626,7 @@ class ProfileScreen extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
       ),
       child: ListTile(
-        leading: Icon(icon, color: color ?? AppColors.primaryGold),
+        leading: Icon(icon, color: color ?? kPrimaryGold),
         title: Text(title, style: TextStyle(fontSize: 15, color: color ?? Colors.white)),
         trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
         onTap: onTap,
@@ -624,4 +634,3 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 }
-
